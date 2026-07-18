@@ -1,0 +1,26 @@
+# Node / Next.js
+node_modules/
+.next/
+out/
+build/
+.env
+.env.local
+.env*.local
+
+# Supabase
+supabase/.temp/
+supabase/.branches/
+
+# Python (scripts de clasificación)
+__pycache__/
+*.pyc
+
+# Datos reales de la farmacia (no versionar)
+*.xlsx
+*.csv
+inventario*
+clasificacion_salida*
+
+# Sistema
+.DS_Store
+Thumbs.db
