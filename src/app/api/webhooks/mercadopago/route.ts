@@ -1,0 +1,51 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+/**
+ * Webhook de Mercado Pago (notificaciones de pago).
+ * MP manda ?type=payment&data.id=<paymentId>; se consulta el pago real a la
+ * API de MP (nunca confiar en el body del webhook) y si está aprobado se
+ * marca el pedido como pagado usando external_reference = pedidos.id.
+ */
+export async function POST(req: NextRequest) {
+  const mpToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+  if (!mpToken) return NextResponse.json({ ok: true }); // pasarela no configurada
+
+  const url = new URL(req.url);
+  const type = url.searchParams.get("type") ?? url.searchParams.get("topic");
+  const dataId =
+    url.searchParams.get("data.id") ?? url.searchParams.get("id");
+
+  if (type !== "payment" || !dataId) return NextResponse.json({ ok: true });
+
+  const resp = await fetch(`https://api.mercadopago.com/v1/payments/${dataId}`, {
+    headers: { Authorization: `Bearer ${mpToken}` },
+  });
+  if (!resp.ok) return NextResponse.json({ ok: true });
+
+  const pago = await resp.json();
+  const pedidoId = pago.external_reference as string | undefined;
+  if (!pedidoId) return NextResponse.json({ ok: true });
+
+  if (pago.status === "approved") {
+    const supabase = createAdminClient();
+    // Los pedidos con receta pasan a validación de la química farmacéutica
+    // antes de prepararse; los demás quedan listos para preparar.
+    const { data: pedido } = await supabase
+      .from("pedidos")
+      .select("requiere_receta, estado")
+      .eq("id", pedidoId)
+      .single();
+
+    if (pedido && pedido.estado === "pendiente_pago") {
+      await supabase
+        .from("pedidos")
+        .update({
+          estado: pedido.requiere_receta ? "pendiente_validacion_qf" : "pagado",
+        })
+        .eq("id", pedidoId);
+    }
+  }
+
+  return NextResponse.json({ ok: true });
+}
