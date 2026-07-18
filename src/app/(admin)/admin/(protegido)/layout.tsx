@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { obtenerStaffActual } from "@/services/admin/auth";
 import { CerrarSesionBoton } from "@/components/admin/CerrarSesionBoton";
+import { Logo } from "@/components/storefront/Logo";
 
 export default async function AdminLayout({
   children,
@@ -15,7 +16,10 @@ export default async function AdminLayout({
     <div className="flex min-h-screen flex-col">
       <header className="border-b bg-brand-dark text-white">
         <div className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-3">
-          <span className="font-bold">AhorraBien — Panel interno</span>
+          <span className="rounded-md bg-white px-2 py-1">
+            <Logo compact />
+          </span>
+          <span className="font-bold">Panel interno</span>
           <nav className="flex gap-4 text-sm">
             <Link href="/admin/pedidos" className="hover:underline">
               Pedidos

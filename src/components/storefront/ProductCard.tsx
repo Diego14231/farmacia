@@ -18,11 +18,11 @@ export function ProductCard({ producto }: { producto: Producto }) {
     producto.condicion_venta !== "no_vendible_online";
 
   return (
-    <Card className="flex h-full flex-col">
-      <CardHeader className="pb-2">
-        <div className="flex aspect-square items-center justify-center rounded-md bg-muted">
+    <Card className="flex h-full flex-col overflow-hidden py-0 transition-shadow hover:shadow-md">
+      <CardHeader className="p-0">
+        <div className="flex aspect-square items-center justify-center bg-gradient-to-b from-muted to-muted/60">
           {/* Sin fotos de producto todavía — placeholder neutro */}
-          <Pill className="size-10 text-muted-foreground/40" aria-hidden />
+          <Pill className="size-10 text-brand-green/30" aria-hidden />
         </div>
       </CardHeader>
       <CardContent className="flex-1 space-y-2 pb-2">

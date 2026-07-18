@@ -1,12 +1,32 @@
+"use client";
+
+import Image from "next/image";
+import { useState } from "react";
 import { Plus } from "lucide-react";
 
 /**
- * Recreación del isotipo de Farmacias AhorraBien (círculo verde con cruz +
- * "Farmacias" en azul + "AhorraBien" en píldora azul) usando los colores de
- * marca. Si en algún momento se cuenta con el archivo del logo real
- * (PNG/SVG), reemplazar esto por <Image src="/logo.png" .../>.
+ * Logo real de Farmacias AhorraBien -- lee public/logo-banner.png. Si el
+ * archivo todavía no existe (404), cae automáticamente a una recreación en
+ * CSS con los mismos colores de marca, así que no rompe nada mientras se
+ * agrega la imagen real.
  */
 export function Logo({ compact = false }: { compact?: boolean }) {
+  const [error, setError] = useState(false);
+
+  if (!error) {
+    return (
+      <Image
+        src="/logo-banner.png"
+        alt="Farmacias AhorraBien"
+        width={800}
+        height={140}
+        priority
+        className={compact ? "h-8 w-auto" : "h-10 w-auto"}
+        onError={() => setError(true)}
+      />
+    );
+  }
+
   return (
     <span className="inline-flex items-center gap-1.5">
       <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand-green">

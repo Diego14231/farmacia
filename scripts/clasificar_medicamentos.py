@@ -186,17 +186,51 @@ def leer_inventario(path_excel):
 def cargar_ya_procesados(path_csv, columna_codigo):
     if not os.path.exists(path_csv):
         return set()
-    with open(path_csv, newline="", encoding="utf-8-sig") as f:
-        return {row[columna_codigo] for row in csv.DictReader(f)}
+    try:
+        with open(path_csv, newline="", encoding="utf-8-sig") as f:
+            return {row[columna_codigo] for row in csv.DictReader(f)}
+    except PermissionError:
+        _error_archivo_abierto(path_csv)
 
 
 def abrir_csv_para_append(path_csv, fieldnames):
     nuevo = not os.path.exists(path_csv)
-    f = open(path_csv, "a", newline="", encoding="utf-8-sig")
+    try:
+        f = open(path_csv, "a", newline="", encoding="utf-8-sig")
+    except PermissionError:
+        _error_archivo_abierto(path_csv)
     writer = csv.DictWriter(f, fieldnames=fieldnames)
     if nuevo:
         writer.writeheader()
     return f, writer
+
+
+def _error_archivo_abierto(path_csv):
+    print(
+        f"\nNo se puede abrir '{path_csv}' -- lo más probable es que esté "
+        "abierto en Excel ahora mismo.\n"
+        "Ciérralo en Excel (o cierra Excel completo) y vuelve a correr el "
+        "mismo comando -- no perdiste nada, retoma donde quedó.\n"
+    )
+    sys.exit(1)
+
+
+def parece_navegador_muerto(error):
+    """True si el error significa que el navegador/pestaña se cerró o
+    crasheó (no un error normal de búsqueda) -- hay que relanzar el
+    navegador entero, no solo reintentar la misma llamada."""
+    msg = str(error).lower()
+    return any(
+        s in msg
+        for s in (
+            "closed",
+            "crashed",
+            "target page",
+            "target closed",
+            "connection closed",
+            "browser has been closed",
+        )
+    )
 
 
 class RegistroSanitarioClient:
@@ -403,6 +437,22 @@ def clasificar_producto(cliente, nombre_producto):
     return resultado
 
 
+# Cada cuántos productos se reinicia el navegador de forma preventiva --
+# evita que la memoria acumulada de miles de páginas termine tumbando el
+# proceso a mitad de camino (lo que generaba filas de error en cadena).
+RECICLAR_NAVEGADOR_CADA = 150
+# Si el navegador se cae y se relanza más de esto SEGUIDO sin lograr
+# procesar ni un producto, algo más grave está pasando (ej. un antivirus
+# bloqueando chrome.exe) -- se corta en vez de reintentar para siempre.
+MAX_RELANZAMIENTOS_SEGUIDOS = 5
+
+
+def _crear_cliente(playwright):
+    browser = playwright.chromium.launch()
+    page = browser.new_page()
+    return browser, RegistroSanitarioClient(page)
+
+
 def main():
     if len(sys.argv) != 3:
         print("Uso: python clasificar_medicamentos.py <inventario.xlsx> <salida.csv>")
@@ -423,19 +473,44 @@ def main():
     f_out, writer = abrir_csv_para_append(path_csv, fieldnames)
 
     with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page()
-        cliente = RegistroSanitarioClient(page)
+        browser, cliente = _crear_cliente(p)
+        items_desde_reinicio = 0
+        relanzamientos_seguidos = 0
 
         try:
-            for i, fila_original in enumerate(pendientes, 1):
+            i = 0
+            while i < len(pendientes):
+                fila_original = pendientes[i]
                 codigo = fila_original["_codigo"]
                 nombre = fila_original["_producto"]
-                print(f"[{i}/{len(pendientes)}] {codigo} — {nombre[:60]}")
+                print(f"[{i + 1}/{len(pendientes)}] {codigo} — {nombre[:60]}")
 
                 try:
                     nuevas_columnas = clasificar_producto(cliente, nombre)
                 except Exception as e:  # noqa: BLE001
+                    if parece_navegador_muerto(e):
+                        relanzamientos_seguidos += 1
+                        if relanzamientos_seguidos > MAX_RELANZAMIENTOS_SEGUIDOS:
+                            print(
+                                f"\nEl navegador se cerró {relanzamientos_seguidos} veces "
+                                "seguidas sin lograr procesar ningún producto -- algo más "
+                                "grave está pasando (revisar antivirus/Defender). Se corta "
+                                "acá; ya quedó guardado el avance, se puede retomar más tarde "
+                                "con el mismo comando."
+                            )
+                            break
+                        print(
+                            f"    El navegador se cerró/crasheó ({e}). Reiniciando "
+                            "navegador y reintentando este mismo producto (no se pierde)…"
+                        )
+                        try:
+                            browser.close()
+                        except Exception:  # noqa: BLE001
+                            pass
+                        browser, cliente = _crear_cliente(p)
+                        items_desde_reinicio = 0
+                        continue  # reintenta el MISMO producto, no avanza i ni escribe fila
+
                     print(f"    FALLÓ tras reintentos, se marca para revisión manual: {e}")
                     nuevas_columnas = {
                         "Es Medicamento": "", "Requiere Receta": "",
@@ -443,15 +518,28 @@ def main():
                         "Detalle": f"Error al consultar el ISP: {e}",
                     }
 
+                relanzamientos_seguidos = 0
                 fila_salida = {k: fila_original[k] for k in header_original}
                 fila_salida.update(nuevas_columnas)
                 writer.writerow(fila_salida)
                 f_out.flush()
+                i += 1
+                items_desde_reinicio += 1
+
+                if items_desde_reinicio >= RECICLAR_NAVEGADOR_CADA:
+                    print("    (reiniciando navegador de forma preventiva por memoria)")
+                    browser.close()
+                    browser, cliente = _crear_cliente(p)
+                    items_desde_reinicio = 0
+
                 time.sleep(REQUEST_DELAY_SECONDS)
         except KeyboardInterrupt:
             print("\nInterrumpido por el usuario. Progreso guardado en", path_csv)
         finally:
-            browser.close()
+            try:
+                browser.close()
+            except Exception:  # noqa: BLE001
+                pass
             f_out.close()
 
 

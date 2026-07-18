@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Logo } from "@/components/storefront/Logo";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -42,8 +43,11 @@ export default function AdminLoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4">
       <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Farmacias AhorraBien — Panel interno</CardTitle>
+        <CardHeader className="items-center space-y-2">
+          <Logo />
+          <CardTitle className="text-muted-foreground text-sm font-normal">
+            Panel interno
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">

@@ -18,6 +18,7 @@ export function ResponderReclamo({ reclamoId }: { reclamoId: string }) {
         rows={2}
       />
       <Button
+        variant="success"
         size="sm"
         disabled={pendiente || !respuesta.trim()}
         onClick={() =>
