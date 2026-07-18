@@ -14,8 +14,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Farmacia Online",
-  description: "Tienda online de la farmacia — catálogo, carrito y despacho a domicilio.",
+  title: {
+    default: "Farmacia AhorraBien — Farmacia Online",
+    template: "%s | Farmacia AhorraBien",
+  },
+  description:
+    "Farmacia AhorraBien — catálogo online, precios convenientes y despacho a domicilio.",
 };
 
 export default function RootLayout({

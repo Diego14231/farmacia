@@ -381,3 +381,22 @@ create policy "cualquiera crea un reclamo" on reclamos
   for insert with check (true);
 create policy "staff responde reclamos" on reclamos
   for update using (is_staff()) with check (is_staff());
+
+-- =========================================================================
+-- GRANTs a los roles de la API de Supabase (anon / authenticated /
+-- service_role). Sin esto PostgREST devuelve "permission denied" aunque
+-- las politicas RLS esten bien -- RLS filtra filas, pero el acceso a la
+-- tabla lo dan los GRANTs. (Leccion aprendida del CRM: nunca revocar anon.)
+-- =========================================================================
+
+grant usage on schema public to anon, authenticated, service_role;
+grant all on all tables in schema public to anon, authenticated, service_role;
+grant all on all sequences in schema public to anon, authenticated, service_role;
+grant execute on all functions in schema public to anon, authenticated, service_role;
+
+alter default privileges in schema public
+  grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public
+  grant all on sequences to anon, authenticated, service_role;
+alter default privileges in schema public
+  grant execute on functions to anon, authenticated, service_role;
