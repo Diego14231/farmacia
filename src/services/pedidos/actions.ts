@@ -18,8 +18,7 @@ export interface DatosCheckout {
 export interface ResultadoCheckout {
   ok: boolean;
   pedidoId?: string;
-  /** URL de pago de Mercado Pago (init_point), si la pasarela está configurada */
-  urlPago?: string;
+  total?: number;
   requiereReceta?: boolean;
   error?: string;
 }
@@ -138,54 +137,142 @@ export async function crearPedido(
     );
     if (errItems) throw errItems;
 
-    // --- Mercado Pago (si está configurado) -----------------------------------
-    let urlPago: string | undefined;
-    const mpToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
-    if (mpToken) {
-      const resp = await fetch("https://api.mercadopago.com/checkout/preferences", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${mpToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          external_reference: pedido.id,
-          items: datos.items.map((i) => {
-            const p = porSku.get(i.sku)!;
-            return {
-              id: p.sku_codigo,
-              title: p.nombre,
-              quantity: i.cantidad,
-              unit_price: p.precio_venta,
-              currency_id: "CLP",
-            };
-          }),
-          back_urls: {
-            success: `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/checkout/gracias?pedido=${pedido.id}`,
-            failure: `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/checkout?error=pago`,
-            pending: `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/checkout/gracias?pedido=${pedido.id}`,
-          },
-          notification_url: process.env.NEXT_PUBLIC_SITE_URL
-            ? `${process.env.NEXT_PUBLIC_SITE_URL}/api/webhooks/mercadopago`
-            : undefined,
-        }),
-      });
-      if (resp.ok) {
-        const pref = await resp.json();
-        urlPago = pref.init_point as string;
-        await supabase
-          .from("pedidos")
-          .update({ metodo_pago: "mercadopago", referencia_pago_externo: pref.id })
-          .eq("id", pedido.id);
-      }
-      // si MP falla, el pedido queda creado en pendiente_pago igual — se
-      // puede reintentar el pago después sin perder el pedido.
-    }
-
-    return { ok: true, pedidoId: pedido.id, urlPago, requiereReceta };
+    // El pago se procesa en un segundo paso con el Card Payment Brick
+    // (ver procesarPagoConTarjeta) -- acá solo se deja el pedido creado y
+    // pendiente de pago, con su total ya calculado desde precios reales.
+    return {
+      ok: true,
+      pedidoId: pedido.id,
+      total: subtotal + costoDespacho,
+      requiereReceta,
+    };
   } catch (e) {
     console.error("crearPedido:", e);
     return { ok: false, error: "No se pudo crear el pedido. Intenta de nuevo." };
+  }
+}
+
+export interface ResultadoPago {
+  ok: boolean;
+  estado?: "aprobado" | "rechazado" | "pendiente";
+  detalle?: string;
+  error?: string;
+}
+
+/**
+ * Procesa el pago de un pedido ya creado con el token de tarjeta que entrega
+ * el Card Payment Brick (nunca tocamos el número de tarjeta directamente,
+ * eso lo maneja Mercado Pago del lado del cliente).
+ *
+ * Usa la Orders API (POST /v1/orders) -- la integración que Diego eligió en
+ * el panel de Mercado Pago ("Checkout API vía Orders"), distinta a la API
+ * de Preferencias/Checkout Pro que se usaba antes.
+ */
+export async function procesarPagoConTarjeta(
+  pedidoId: string,
+  datosTarjeta: {
+    token: string;
+    payment_method_id: string;
+    /** "credit_card" | "debit_card" -- lo entrega el Brick en additionalData.paymentTypeId */
+    tipoTarjeta: string;
+    installments: number;
+    issuer_id?: string;
+    payerEmail: string;
+  },
+): Promise<ResultadoPago> {
+  const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
+  if (!accessToken)
+    return { ok: false, error: "El pago con tarjeta no está configurado todavía." };
+
+  try {
+    const supabase = createAdminClient();
+    const { data: pedido, error: errPedido } = await supabase
+      .from("pedidos")
+      .select("id, total, estado, requiere_receta")
+      .eq("id", pedidoId)
+      .single();
+    if (errPedido || !pedido) return { ok: false, error: "Pedido no encontrado." };
+    if (pedido.estado !== "pendiente_pago")
+      return { ok: false, error: "Este pedido ya no está pendiente de pago." };
+
+    // El monto SIEMPRE sale de la base de datos, nunca del formulario del
+    // navegador -- evita que alguien manipule el precio desde el cliente.
+    const monto = Number(pedido.total).toFixed(2);
+
+    const resp = await fetch("https://api.mercadopago.com/v1/orders", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+        "X-Idempotency-Key": `${pedidoId}-${crypto.randomUUID()}`,
+      },
+      body: JSON.stringify({
+        type: "online",
+        processing_mode: "automatic",
+        total_amount: monto,
+        external_reference: pedidoId,
+        payer: { email: datosTarjeta.payerEmail },
+        transactions: {
+          payments: [
+            {
+              amount: monto,
+              payment_method: {
+                id: datosTarjeta.payment_method_id,
+                type: datosTarjeta.tipoTarjeta === "debit_card" ? "debit_card" : "credit_card",
+                token: datosTarjeta.token,
+                installments: datosTarjeta.installments,
+                ...(datosTarjeta.issuer_id ? { issuer_id: datosTarjeta.issuer_id } : {}),
+              },
+            },
+          ],
+        },
+      }),
+    });
+
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      console.error("Mercado Pago Orders API error:", data);
+      return {
+        ok: false,
+        error: data?.message ?? "El pago fue rechazado. Verifica los datos de la tarjeta.",
+      };
+    }
+
+    const pago = data.transactions?.payments?.[0];
+    const estadoPago = pago?.status ?? data.status;
+
+    await supabase
+      .from("pedidos")
+      .update({
+        metodo_pago: "mercadopago",
+        referencia_pago_externo: data.id,
+      })
+      .eq("id", pedidoId);
+
+    if (estadoPago === "processed" || estadoPago === "approved") {
+      await supabase
+        .from("pedidos")
+        .update({
+          estado: pedido.requiere_receta ? "pendiente_validacion_qf" : "pagado",
+        })
+        .eq("id", pedidoId);
+      return { ok: true, estado: "aprobado" };
+    }
+
+    if (estadoPago === "rejected") {
+      return {
+        ok: true,
+        estado: "rechazado",
+        detalle: pago?.status_detail ?? "Pago rechazado por el emisor de la tarjeta.",
+      };
+    }
+
+    // pending / in_process: queda pendiente_pago, se confirma por webhook
+    return { ok: true, estado: "pendiente" };
+  } catch (e) {
+    console.error("procesarPagoConTarjeta:", e);
+    return { ok: false, error: "No se pudo procesar el pago. Intenta de nuevo." };
   }
 }
 

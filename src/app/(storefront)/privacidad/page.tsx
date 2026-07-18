@@ -5,7 +5,7 @@ export default function PrivacidadPage() {
     <article className="prose prose-sm mx-auto max-w-2xl py-8 dark:prose-invert">
       <h1>Política de privacidad y tratamiento de datos personales</h1>
       <p>
-        Farmacia AhorraBien trata los datos personales de sus clientes
+        Farmacias AhorraBien trata los datos personales de sus clientes
         conforme a la Ley N°21.719 de Protección de Datos Personales.
       </p>
 

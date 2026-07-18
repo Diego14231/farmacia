@@ -33,7 +33,7 @@ export default async function ProductoPage({ params }: Props) {
         </div>
         <div className="space-y-4">
           <h1 className="text-2xl font-semibold">{producto.nombre}</h1>
-          <p className="text-3xl font-bold text-emerald-700">
+          <p className="text-3xl font-bold text-brand-green">
             {formatearPrecio(producto.precio_venta)}
           </p>
 

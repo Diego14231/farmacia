@@ -13,7 +13,7 @@ export default async function AdminLayout({
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b bg-emerald-800 text-white">
+      <header className="border-b bg-brand-dark text-white">
         <div className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-3">
           <span className="font-bold">AhorraBien — Panel interno</span>
           <nav className="flex gap-4 text-sm">

@@ -32,7 +32,7 @@ export function ProductCard({ producto }: { producto: Producto }) {
         >
           {producto.nombre}
         </Link>
-        <p className="text-lg font-bold text-emerald-700">
+        <p className="text-lg font-bold text-brand-green">
           {formatearPrecio(producto.precio_venta)}
         </p>
         {requiereReceta && (

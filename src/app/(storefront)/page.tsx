@@ -16,11 +16,11 @@ export default async function Home() {
 
   return (
     <div className="space-y-12">
-      <section className="rounded-xl bg-emerald-700 px-6 py-12 text-center text-white">
-        <h1 className="text-3xl font-bold sm:text-4xl">Farmacia AhorraBien</h1>
-        <p className="mx-auto mt-3 max-w-xl text-emerald-50">
-          Tu farmacia de confianza, ahora online — precios convenientes y
-          despacho a domicilio.
+      <section className="rounded-xl bg-gradient-to-br from-brand to-brand-dark px-6 py-12 text-center text-white">
+        <h1 className="text-3xl font-bold sm:text-4xl">Farmacias AhorraBien</h1>
+        <p className="mt-1 font-semibold text-brand-green">Tu salud a tu alcance</p>
+        <p className="mx-auto mt-3 max-w-xl text-blue-50">
+          Precios convenientes y despacho a domicilio.
         </p>
         <Button asChild size="lg" variant="secondary" className="mt-6">
           <Link href="/productos">Ver catálogo completo</Link>

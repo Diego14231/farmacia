@@ -2,14 +2,15 @@ import Link from "next/link";
 import type { Categoria } from "@/types/database";
 import { CarritoBoton } from "./CarritoBoton";
 import { BuscadorProductos } from "./BuscadorProductos";
+import { Logo } from "./Logo";
 
 export function Header({ categorias }: { categorias: Categoria[] }) {
   const visibles = categorias.filter((c) => c.slug !== "por-clasificar");
   return (
     <header className="border-b bg-background">
       <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
-        <Link href="/" className="shrink-0 text-xl font-bold tracking-tight text-emerald-700">
-          Farmacia AhorraBien
+        <Link href="/" className="shrink-0 text-lg">
+          <Logo />
         </Link>
         <div className="hidden flex-1 md:block">
           <BuscadorProductos />

@@ -2,11 +2,12 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Middleware estándar de @supabase/ssr: refresca la sesión (cookies) en
- * cada request para que los Server Components vean al usuario autenticado.
- * Solo corre en /admin — el storefront es público y no necesita sesión.
+ * Proxy estándar de @supabase/ssr (antes "middleware", renombrado en
+ * Next.js 16): refresca la sesión (cookies) en cada request para que los
+ * Server Components vean al usuario autenticado. Solo corre en /admin — el
+ * storefront es público y no necesita sesión.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(

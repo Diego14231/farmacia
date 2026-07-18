@@ -96,7 +96,7 @@ export function EditarProductoFila({ producto, categorias, precioFormateado }: P
           checked={producto.activoOnline}
           disabled={pendiente}
           onChange={(e) => actualizar({ activo_online: e.target.checked })}
-          className="size-4 accent-emerald-600"
+          className="size-4 accent-brand"
           aria-label={`Visible online: ${producto.nombre}`}
         />
       </td>

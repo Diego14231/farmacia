@@ -10,7 +10,7 @@ export function Footer() {
     <footer className="mt-auto border-t bg-muted/40 text-sm">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:grid-cols-3">
         <div>
-          <p className="font-semibold">Farmacia AhorraBien</p>
+          <p className="font-semibold">Farmacias AhorraBien</p>
           <p className="mt-2 text-muted-foreground">
             Dirección: [PENDIENTE — dirección del local]
           </p>

@@ -43,7 +43,7 @@ export default function AdminLoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Farmacia AhorraBien — Panel interno</CardTitle>
+          <CardTitle>Farmacias AhorraBien — Panel interno</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">

@@ -32,7 +32,7 @@ export default async function GraciasPage({ searchParams }: Props) {
 
   return (
     <div className="mx-auto max-w-lg space-y-6 py-16 text-center">
-      <CheckCircle2 className="mx-auto size-14 text-emerald-600" />
+      <CheckCircle2 className="mx-auto size-14 text-brand-green" />
       <h1 className="text-2xl font-semibold">¡Pedido recibido!</h1>
 
       {resumen ? (
