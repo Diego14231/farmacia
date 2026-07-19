@@ -48,8 +48,9 @@ export default async function GraciasPage({ searchParams }: Props) {
           )}
           {resumen.requiereReceta && (
             <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-              Tu receta será revisada por nuestro químico farmacéutico. Te
-              avisaremos por email cuando esté validada.
+              Tu receta será revisada por nuestro químico farmacéutico. Puedes
+              ver el resultado más abajo, en &ldquo;Seguimiento de
+              pedido&rdquo;.
             </p>
           )}
         </div>
@@ -58,6 +59,21 @@ export default async function GraciasPage({ searchParams }: Props) {
           Tu pedido fue registrado. Te contactaremos para coordinar el
           despacho.
         </p>
+      )}
+
+      {pedidoId && (
+        <div className="rounded-md border bg-muted/40 p-3 text-sm">
+          <p className="text-muted-foreground">Guarda tu número de pedido:</p>
+          <p className="font-mono font-medium break-all">{pedidoId}</p>
+          <p className="mt-1 text-muted-foreground">
+            Con este número y el email de tu compra puedes revisar el estado
+            en cualquier momento en{" "}
+            <Link href="/pedido" className="underline">
+              Seguimiento de pedido
+            </Link>
+            .
+          </p>
+        </div>
       )}
 
       <Button asChild>

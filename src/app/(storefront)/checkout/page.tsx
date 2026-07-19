@@ -135,8 +135,8 @@ export default function CheckoutPage() {
     setEnviando(false);
   }
 
-  async function onSubmitTarjeta(datosTarjeta: DatosTarjetaBrick) {
-    if (!pedido) return;
+  async function onSubmitTarjeta(datosTarjeta: DatosTarjetaBrick): Promise<boolean> {
+    if (!pedido) return false;
     setProcesandoPago(true);
     setError(null);
 
@@ -145,17 +145,22 @@ export default function CheckoutPage() {
     if (!resultado.ok) {
       setError(resultado.error ?? "No se pudo procesar el pago.");
       setProcesandoPago(false);
-      return;
+      return false;
     }
 
     if (resultado.estado === "rechazado") {
       setError(resultado.detalle ?? "Tu tarjeta fue rechazada. Intenta con otra.");
       setProcesandoPago(false);
-      return;
+      return false;
     }
 
+    // "aprobado" y "pendiente" se tratan igual acá: el pedido ya está creado
+    // y un pago pendiente se confirma después por webhook (ver
+    // procesarPagoConTarjeta) -- no tiene sentido dejar al comprador
+    // esperando en el formulario de tarjeta.
     vaciar();
     router.push(`/checkout/gracias?pedido=${pedido.id}`);
+    return true;
   }
 
   // --- Paso 2: pago con tarjeta ------------------------------------------------
@@ -169,6 +174,16 @@ export default function CheckoutPage() {
             {formatearPrecio(pedido.total)}
           </span>
         </p>
+        {process.env.NEXT_PUBLIC_MERCADO_PAGO_MODO_PRUEBA === "true" && (
+          <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+            <p className="font-medium">Modo de pruebas — no uses una tarjeta real.</p>
+            <p className="mt-1">
+              Tarjeta: <code>4509 9535 6623 3704</code> · Vencimiento: cualquier
+              fecha futura · CVV: <code>123</code> · Nombre del titular:{" "}
+              <code>APRO</code> (aprueba el pago).
+            </p>
+          </div>
+        )}
         {error && (
           <p className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900">
             {error}

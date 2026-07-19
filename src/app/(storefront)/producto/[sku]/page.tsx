@@ -3,7 +3,11 @@ import {
   obtenerBioequivalentes,
   obtenerProductoPorSku,
 } from "@/services/productos/productosService";
-import { formatearPrecio, ETIQUETA_CONDICION_VENTA } from "@/lib/formato";
+import {
+  formatearPrecio,
+  ETIQUETA_CONDICION_VENTA,
+  calcularPrecioPorUnidad,
+} from "@/lib/formato";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { AgregarAlCarrito } from "@/components/storefront/AgregarAlCarrito";
@@ -20,6 +24,7 @@ export default async function ProductoPage({ params }: Props) {
   if (!producto) notFound();
 
   const bioequivalentes = await obtenerBioequivalentes(producto);
+  const precioPorUnidad = calcularPrecioPorUnidad(producto.nombre, producto.precio_venta);
   const requiereReceta =
     producto.condicion_venta != null &&
     producto.condicion_venta !== "directa" &&
@@ -33,9 +38,20 @@ export default async function ProductoPage({ params }: Props) {
         </div>
         <div className="space-y-4">
           <h1 className="text-2xl font-semibold">{producto.nombre}</h1>
-          <p className="text-3xl font-bold text-brand-green">
-            {formatearPrecio(producto.precio_venta)}
-          </p>
+          <div>
+            <p className="text-3xl font-bold text-brand-green">
+              {formatearPrecio(producto.precio_venta)}
+            </p>
+            {precioPorUnidad && (
+              <p className="text-sm text-muted-foreground">
+                Precio por unidad de medida:{" "}
+                <span className="font-medium text-foreground">
+                  {formatearPrecio(precioPorUnidad.precioUnitario)} x{" "}
+                  {precioPorUnidad.unidad}
+                </span>
+              </p>
+            )}
+          </div>
 
           <div className="flex flex-wrap gap-2">
             {producto.condicion_venta && (
@@ -85,7 +101,10 @@ export default async function ProductoPage({ params }: Props) {
           {producto.descripcion && (
             <>
               <Separator />
-              <p className="text-sm">{producto.descripcion}</p>
+              <div>
+                <h2 className="mb-1 font-semibold">Descripción</h2>
+                <p className="text-sm text-muted-foreground">{producto.descripcion}</p>
+              </div>
             </>
           )}
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { enviarConfirmacionPedido } from "@/services/pedidos/emails";
 
 /**
  * Webhook de Mercado Pago (notificaciones de pago).
@@ -49,6 +50,10 @@ export async function POST(req: NextRequest) {
           estado: pedido.requiere_receta ? "pendiente_validacion_qf" : "pagado",
         })
         .eq("id", pedidoId);
+      // Idempotente (ver migración stock_pedido): seguro aunque el camino
+      // síncrono ya lo haya descontado.
+      await supabase.rpc("descontar_stock_pedido", { p_pedido_id: pedidoId });
+      await enviarConfirmacionPedido(pedidoId);
     }
   }
 

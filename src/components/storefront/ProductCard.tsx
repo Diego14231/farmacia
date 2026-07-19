@@ -1,6 +1,10 @@
 import Link from "next/link";
 import type { Producto } from "@/types/database";
-import { formatearPrecio, ETIQUETA_CONDICION_VENTA } from "@/lib/formato";
+import {
+  formatearPrecio,
+  ETIQUETA_CONDICION_VENTA,
+  calcularPrecioPorUnidad,
+} from "@/lib/formato";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -16,25 +20,35 @@ export function ProductCard({ producto }: { producto: Producto }) {
     producto.condicion_venta != null &&
     producto.condicion_venta !== "directa" &&
     producto.condicion_venta !== "no_vendible_online";
+  const precioPorUnidad = calcularPrecioPorUnidad(producto.nombre, producto.precio_venta);
+  const href = `/producto/${encodeURIComponent(producto.sku_codigo)}`;
 
   return (
     <Card className="flex h-full flex-col overflow-hidden py-0 transition-shadow hover:shadow-md">
       <CardHeader className="p-0">
-        <div className="flex aspect-square items-center justify-center bg-gradient-to-b from-muted to-muted/60">
+        <Link
+          href={href}
+          className="flex aspect-square items-center justify-center bg-gradient-to-b from-muted to-muted/60"
+          aria-label={producto.nombre}
+        >
           {/* Sin fotos de producto todavía — placeholder neutro */}
           <Pill className="size-10 text-brand-green/30" aria-hidden />
-        </div>
+        </Link>
       </CardHeader>
       <CardContent className="flex-1 space-y-2 pb-2">
-        <Link
-          href={`/producto/${encodeURIComponent(producto.sku_codigo)}`}
-          className="line-clamp-2 text-sm font-medium hover:underline"
-        >
+        <Link href={href} className="line-clamp-2 text-sm font-medium hover:underline">
           {producto.nombre}
         </Link>
-        <p className="text-lg font-bold text-brand-green">
-          {formatearPrecio(producto.precio_venta)}
-        </p>
+        <div>
+          <p className="text-lg font-bold text-brand-green">
+            {formatearPrecio(producto.precio_venta)}
+          </p>
+          {precioPorUnidad && (
+            <p className="text-xs text-muted-foreground">
+              {formatearPrecio(precioPorUnidad.precioUnitario)} x {precioPorUnidad.unidad}
+            </p>
+          )}
+        </div>
         {requiereReceta && (
           <Badge variant="secondary" className="text-xs">
             {ETIQUETA_CONDICION_VENTA[producto.condicion_venta!]}

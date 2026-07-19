@@ -41,6 +41,11 @@ export function Footer() {
                 Reclamos
               </Link>
             </li>
+            <li>
+              <Link href="/pedido" className="hover:underline">
+                Seguimiento de pedido
+              </Link>
+            </li>
           </ul>
         </div>
         <div>

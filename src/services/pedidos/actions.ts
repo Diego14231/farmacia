@@ -1,6 +1,41 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { enviarConfirmacionPedido } from "./emails";
+
+// Traducciones de los status_detail más comunes de Mercado Pago (ver
+// https://www.mercadopago.cl/developers/es/docs/checkout-api/response-handling/collection-results).
+const MOTIVO_RECHAZO: Record<string, string> = {
+  cc_rejected_bad_filled_card_number: "Revisa el número de la tarjeta.",
+  cc_rejected_bad_filled_date: "Revisa la fecha de vencimiento.",
+  cc_rejected_bad_filled_security_code: "Revisa el código de seguridad (CVV).",
+  cc_rejected_bad_filled_other: "Revisa los datos de la tarjeta.",
+  cc_rejected_call_for_authorize: "Debes autorizar el pago con tu banco antes de reintentar.",
+  cc_rejected_card_disabled: "La tarjeta está deshabilitada. Contacta a tu banco.",
+  cc_rejected_duplicated_payment: "Ya existe un pago igual reciente. Espera unos minutos.",
+  cc_rejected_high_risk: "El pago fue rechazado por prevención de fraude.",
+  cc_rejected_insufficient_amount: "Fondos insuficientes.",
+  cc_rejected_invalid_installments: "Número de cuotas inválido para esta tarjeta.",
+  cc_rejected_max_attempts: "Superaste el número de intentos permitidos.",
+  cc_rejected_other_reason: "El emisor de la tarjeta rechazó el pago.",
+  rejected_by_issuer: "El emisor de la tarjeta rechazó el pago.",
+};
+
+/**
+ * Traduce el status_detail crudo de MP a un mensaje accionable. En modo
+ * prueba, agrega el recordatorio de usar el nombre "APRO" -- en sandbox el
+ * resultado del pago depende del nombre del titular, no de si los demás
+ * datos están bien, así que es el motivo más común de "rechazo" al probar.
+ */
+function mensajeRechazo(statusDetail?: string): string {
+  const base =
+    (statusDetail && MOTIVO_RECHAZO[statusDetail]) ??
+    "Tu tarjeta fue rechazada. Intenta con otra.";
+  if (process.env.NEXT_PUBLIC_MERCADO_PAGO_MODO_PRUEBA === "true") {
+    return `${base} En modo de pruebas, usa exactamente el nombre "APRO" como titular de la tarjeta para que el pago se apruebe.`;
+  }
+  return base;
+}
 
 export interface DatosCheckout {
   nombre: string;
@@ -197,7 +232,24 @@ export async function procesarPagoConTarjeta(
 
     // El monto SIEMPRE sale de la base de datos, nunca del formulario del
     // navegador -- evita que alguien manipule el precio desde el cliente.
-    const monto = Number(pedido.total).toFixed(2);
+    // OJO: la Orders API de MP para CLP (peso chileno, sin decimales) exige
+    // el monto como entero SIN punto decimal -- "12990", no "12990.00". Con
+    // decimales, MP responde 400 "does not match pattern" en TODOS los
+    // intentos (nunca aprueba ninguna tarjeta), y como ese error ocurre en
+    // esta llamada servidor-a-servidor, nunca aparece en el Network tab del
+    // navegador -- solo en los logs del servidor.
+    const monto = String(Math.round(Number(pedido.total)));
+
+    // Con credenciales de PRUEBA, MP rechaza cualquier email real con
+    // "invalid_email_for_sandbox" (código verificado en vivo) -- exige que
+    // termine en "@testuser.com", sin importar cuál sea el resto. Esto NO
+    // afecta el email real del cliente (el que queda guardado en `clientes`
+    // y al que le llegan los emails de confirmación): solo se sustituye en
+    // este payload que viaja a Mercado Pago.
+    const emailParaMP =
+      process.env.NEXT_PUBLIC_MERCADO_PAGO_MODO_PRUEBA === "true"
+        ? `${datosTarjeta.payerEmail.split("@")[0].replace(/[^a-zA-Z0-9._-]/g, "") || "cliente"}@testuser.com`
+        : datosTarjeta.payerEmail;
 
     const resp = await fetch("https://api.mercadopago.com/v1/orders", {
       method: "POST",
@@ -211,7 +263,7 @@ export async function procesarPagoConTarjeta(
         processing_mode: "automatic",
         total_amount: monto,
         external_reference: pedidoId,
-        payer: { email: datosTarjeta.payerEmail },
+        payer: { email: emailParaMP },
         transactions: {
           payments: [
             {
@@ -221,7 +273,12 @@ export async function procesarPagoConTarjeta(
                 type: datosTarjeta.tipoTarjeta === "debit_card" ? "debit_card" : "credit_card",
                 token: datosTarjeta.token,
                 installments: datosTarjeta.installments,
-                ...(datosTarjeta.issuer_id ? { issuer_id: datosTarjeta.issuer_id } : {}),
+                // OJO: la Orders API rechaza esta llamada con 400
+                // "unsupported_properties" / "additionalProperties 'issuer_id'
+                // not allowed" si se incluye issuer_id acá -- pese a que el
+                // Brick sí lo entrega en formData, este endpoint no lo acepta.
+                // Verificado en vivo: sacarlo es lo que hace que el pago
+                // finalmente se apruebe.
               },
             },
           ],
@@ -232,10 +289,29 @@ export async function procesarPagoConTarjeta(
     const data = await resp.json();
 
     if (!resp.ok) {
+      // OJO: un pago RECHAZADO (tarjeta declinada) también llega acá -- la
+      // Orders API lo devuelve como HTTP 402 con "status":"failed" y el
+      // detalle real en transactions.payments[0].status_detail (verificado en
+      // vivo), no como un 2xx con estado "rejected" como hacen otras APIs de
+      // MP. Si es ese caso, se trata igual que un rechazo normal (si no, el
+      // código de abajo que maneja "rejected" nunca se ejecuta). Cualquier
+      // otro error (400 de validación, credenciales, etc.) sigue siendo un
+      // error genérico -- ese detalle técnico en inglés queda solo en el log.
+      const pagoFallido = data?.data?.transactions?.payments?.[0];
+      if (resp.status === 402 && pagoFallido) {
+        console.error("Mercado Pago: pago rechazado", pagoFallido);
+        return {
+          ok: true,
+          estado: "rechazado",
+          detalle: mensajeRechazo(pagoFallido.status_detail),
+        };
+      }
+
       console.error("Mercado Pago Orders API error:", data);
       return {
         ok: false,
-        error: data?.message ?? "El pago fue rechazado. Verifica los datos de la tarjeta.",
+        error:
+          "No se pudo procesar el pago. Verifica los datos de la tarjeta o intenta con otra.",
       };
     }
 
@@ -257,6 +333,10 @@ export async function procesarPagoConTarjeta(
           estado: pedido.requiere_receta ? "pendiente_validacion_qf" : "pagado",
         })
         .eq("id", pedidoId);
+      // Descuenta stock real ahora que el pago está confirmado -- idempotente,
+      // así que si el webhook de MP también dispara esto no se descuenta dos veces.
+      await supabase.rpc("descontar_stock_pedido", { p_pedido_id: pedidoId });
+      await enviarConfirmacionPedido(pedidoId);
       return { ok: true, estado: "aprobado" };
     }
 
@@ -264,7 +344,7 @@ export async function procesarPagoConTarjeta(
       return {
         ok: true,
         estado: "rechazado",
-        detalle: pago?.status_detail ?? "Pago rechazado por el emisor de la tarjeta.",
+        detalle: mensajeRechazo(pago?.status_detail),
       };
     }
 
@@ -274,6 +354,96 @@ export async function procesarPagoConTarjeta(
     console.error("procesarPagoConTarjeta:", e);
     return { ok: false, error: "No se pudo procesar el pago. Intenta de nuevo." };
   }
+}
+
+export interface DetalleItemPedido {
+  nombre: string;
+  cantidad: number;
+  precioUnitario: number;
+}
+
+export interface DetallePedido {
+  id: string;
+  estado: string;
+  total: number;
+  createdAt: string;
+  requiereReceta: boolean;
+  estadoReceta: string | null;
+  motivoRechazoReceta: string | null;
+  items: DetalleItemPedido[];
+}
+
+export interface ResultadoConsultaPedido {
+  ok: boolean;
+  pedido?: DetallePedido;
+  error?: string;
+}
+
+/**
+ * Consulta guest: como el checkout no exige cuenta de cliente (ver
+ * services/pedidos/actions.ts:crearPedido), el único modo de que alguien vea
+ * su pedido es con el ID (que recibe en la página de gracias) + el email con
+ * el que compró. Si no calzan, se devuelve el mismo error genérico -- no se
+ * confirma si el ID existe, para no filtrar esa información a quien no
+ * conoce el email real.
+ */
+export async function consultarPedido(
+  pedidoId: string,
+  email: string,
+): Promise<ResultadoConsultaPedido> {
+  const idLimpio = pedidoId.trim();
+  const emailLimpio = email.trim().toLowerCase();
+  if (!idLimpio || !emailLimpio)
+    return { ok: false, error: "Ingresa el número de pedido y el email." };
+
+  const supabase = createAdminClient();
+
+  const { data: pedido, error } = await supabase
+    .from("pedidos")
+    .select(
+      "id, estado, total, created_at, requiere_receta, clientes!inner(email), recetas(estado, motivo_rechazo), pedido_items(cantidad, precio_unitario, productos(nombre))",
+    )
+    .eq("id", idLimpio)
+    .eq("clientes.email", emailLimpio)
+    .maybeSingle();
+
+  if (error || !pedido)
+    return { ok: false, error: "No encontramos un pedido con ese número y email." };
+
+  const receta = pedido.recetas as unknown as
+    | { estado: string; motivo_rechazo: string | null }
+    | { estado: string; motivo_rechazo: string | null }[]
+    | null;
+  const recetaUnica = Array.isArray(receta) ? receta[0] : receta;
+
+  const items = (
+    (pedido.pedido_items ?? []) as unknown as Array<{
+      cantidad: number;
+      precio_unitario: number;
+      productos: { nombre: string } | { nombre: string }[] | null;
+    }>
+  ).map((it) => {
+    const prod = Array.isArray(it.productos) ? it.productos[0] : it.productos;
+    return {
+      nombre: prod?.nombre ?? "Producto",
+      cantidad: it.cantidad,
+      precioUnitario: it.precio_unitario,
+    };
+  });
+
+  return {
+    ok: true,
+    pedido: {
+      id: pedido.id,
+      estado: pedido.estado,
+      total: pedido.total,
+      createdAt: pedido.created_at,
+      requiereReceta: pedido.requiere_receta,
+      estadoReceta: recetaUnica?.estado ?? null,
+      motivoRechazoReceta: recetaUnica?.motivo_rechazo ?? null,
+      items,
+    },
+  };
 }
 
 /**
