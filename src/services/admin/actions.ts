@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { obtenerStaffActual } from "./auth";
 import type { EstadoPedido } from "@/types/database";
+import {
+  enviarNotificacionEstadoPedido,
+  enviarNotificacionReceta,
+} from "@/services/pedidos/emails";
 
 const ESTADOS_VALIDOS: EstadoPedido[] = [
   "pendiente_pago",
@@ -30,6 +34,20 @@ export async function cambiarEstadoPedido(
     .update({ estado })
     .eq("id", pedidoId);
   if (error) return { ok: false, error: error.message };
+
+  // Si se cancela un pedido cuyo stock ya se había descontado (pagado), se
+  // devuelve al inventario -- no se vendió realmente.
+  if (estado === "cancelado")
+    await supabase.rpc("restaurar_stock_pedido", { p_pedido_id: pedidoId });
+
+  // El staff también puede marcar un pedido como pagado manualmente (ej. una
+  // venta en efectivo/presencial) sin pasar por Mercado Pago -- el descuento
+  // de stock es idempotente, así que es seguro llamarlo aquí también.
+  if (estado === "pagado" || estado === "pendiente_validacion_qf")
+    await supabase.rpc("descontar_stock_pedido", { p_pedido_id: pedidoId });
+
+  if (estado === "despachado" || estado === "entregado")
+    await enviarNotificacionEstadoPedido(pedidoId, estado);
 
   revalidatePath("/admin/pedidos");
   return { ok: true };
@@ -73,7 +91,13 @@ export async function resolverReceta(
       .from("pedidos")
       .update({ estado: decision === "validada" ? "en_preparacion" : "cancelado" })
       .eq("id", pedido.id);
+    // El pedido ya estaba pagado (por eso llegó a validación QF), así que si
+    // se rechaza la receta hay que devolver el stock que se había descontado.
+    if (decision === "rechazada")
+      await supabase.rpc("restaurar_stock_pedido", { p_pedido_id: pedido.id });
   }
+
+  await enviarNotificacionReceta(recetaId, decision, motivoRechazo);
 
   revalidatePath("/admin/recetas");
   revalidatePath("/admin/pedidos");
@@ -110,6 +134,7 @@ export async function actualizarProducto(
     condicion_venta?: string | null;
     precio_venta?: number;
     stock_actual?: number;
+    descripcion?: string | null;
   },
 ): Promise<{ ok: boolean; error?: string }> {
   const staff = await obtenerStaffActual();
@@ -124,6 +149,66 @@ export async function actualizarProducto(
 
   revalidatePath("/admin/productos");
   return { ok: true };
+}
+
+/**
+ * Confirma la clasificación ISP de UN producto (cola de revisión manual en
+ * /admin/clasificacion) -- solo química farmacéutico/admin, mismo requisito
+ * legal que resolverReceta: un script no reemplaza esta firma.
+ */
+export async function confirmarClasificacion(
+  productoId: string,
+  campos: { es_medicamento: boolean; condicion_venta: string | null },
+): Promise<{ ok: boolean; error?: string }> {
+  const staff = await obtenerStaffActual();
+  if (!staff) return { ok: false, error: "No autorizado." };
+  if (staff.rol !== "quimico_farmaceutico" && staff.rol !== "admin")
+    return {
+      ok: false,
+      error: "Solo el químico farmacéutico puede confirmar la clasificación.",
+    };
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("productos")
+    .update({
+      es_medicamento: campos.es_medicamento,
+      condicion_venta: campos.condicion_venta,
+      clasificacion_revisada: true,
+    })
+    .eq("id", productoId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/admin/clasificacion");
+  return { ok: true };
+}
+
+/**
+ * Confirma en lote los productos de "confianza alta" (ver migración
+ * confirmar_clasificacion_alta_confianza) -- deja fuera a propósito todos los
+ * casos ambiguos, esos siempre pasan por confirmarClasificacion().
+ */
+export async function confirmarClasificacionAltaConfianza(): Promise<{
+  ok: boolean;
+  confirmados?: number;
+  error?: string;
+}> {
+  const staff = await obtenerStaffActual();
+  if (!staff) return { ok: false, error: "No autorizado." };
+  if (staff.rol !== "quimico_farmaceutico" && staff.rol !== "admin")
+    return {
+      ok: false,
+      error: "Solo el químico farmacéutico puede confirmar la clasificación.",
+    };
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase.rpc(
+    "confirmar_clasificacion_alta_confianza",
+  );
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/admin/clasificacion");
+  return { ok: true, confirmados: data as number };
 }
 
 export async function responderReclamo(

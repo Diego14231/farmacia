@@ -7,7 +7,7 @@ export default function MarcoRegulatorioPage() {
 
       <h2>Autorización sanitaria de funcionamiento</h2>
       <p>
-        Farmacia AhorraBien opera bajo resolución sanitaria de instalación y
+        Farmacias AhorraBien opera bajo resolución sanitaria de instalación y
         funcionamiento N° <strong>[PENDIENTE]</strong>, de fecha{" "}
         <strong>[PENDIENTE]</strong>, otorgada por la autoridad sanitaria
         competente.

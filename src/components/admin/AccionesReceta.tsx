@@ -31,7 +31,7 @@ export function AccionesReceta({ recetaId }: { recetaId: string }) {
       </Button>
       {!rechazando ? (
         <>
-          <Button size="sm" disabled={pendiente} onClick={() => decidir("validada")}>
+          <Button variant="success" size="sm" disabled={pendiente} onClick={() => decidir("validada")}>
             Validar
           </Button>
           <Button

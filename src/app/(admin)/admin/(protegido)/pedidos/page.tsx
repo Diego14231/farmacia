@@ -11,7 +11,7 @@ const COLOR_ESTADO: Record<string, string> = {
   pendiente_validacion_qf: "bg-amber-100 text-amber-900",
   en_preparacion: "bg-indigo-100 text-indigo-900",
   despachado: "bg-cyan-100 text-cyan-900",
-  entregado: "bg-emerald-100 text-emerald-900",
+  entregado: "bg-brand-green/15 text-brand-green",
   cancelado: "bg-red-100 text-red-900",
 };
 

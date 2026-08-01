@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,9 +13,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Logo } from "@/components/storefront/Logo";
 
-export default function AdminLoginPage() {
+export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -32,22 +32,19 @@ export default function AdminLoginPage() {
     });
 
     if (error) {
-      setError("Credenciales incorrectas.");
+      setError("Email o contraseña incorrectos.");
       setCargando(false);
       return;
     }
-    router.push("/admin/pedidos");
+    router.push("/cuenta");
     router.refresh();
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4">
+    <div className="flex justify-center py-8">
       <Card className="w-full max-w-sm">
-        <CardHeader className="items-center space-y-2">
-          <Logo />
-          <CardTitle className="text-muted-foreground text-sm font-normal">
-            Panel interno
-          </CardTitle>
+        <CardHeader>
+          <CardTitle>Iniciar sesión</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
@@ -63,6 +60,12 @@ export default function AdminLoginPage() {
             <Button type="submit" className="w-full" disabled={cargando}>
               {cargando ? "Ingresando…" : "Ingresar"}
             </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              ¿No tienes cuenta?{" "}
+              <Link href="/registro" className="underline">
+                Regístrate
+              </Link>
+            </p>
           </form>
         </CardContent>
       </Card>

@@ -36,6 +36,14 @@ export interface Producto {
   activo_online: boolean;
   imagen_url: string | null;
   departamento_original: string | null;
+  // Sugerencia de scripts/clasificar_medicamentos.py (staging, no
+  // autoritativa) -- ver /admin/clasificacion. La Química Farmacéutica
+  // confirma o corrige antes de que cuente para es_medicamento/condicion_venta.
+  clasificacion_sugerida_medicamento: string | null;
+  clasificacion_sugerida_receta: string | null;
+  clasificacion_detalle: string | null;
+  clasificacion_revisar_manual: boolean;
+  clasificacion_revisada: boolean;
   created_at: string;
   updated_at: string;
 }

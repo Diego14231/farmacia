@@ -16,7 +16,7 @@ export default async function AdminProductosPage({ searchParams }: Props) {
 
   let query = supabase
     .from("productos")
-    .select("id, sku_codigo, nombre, precio_venta, stock_actual, activo_online, condicion_venta, categoria_id, categorias(nombre)")
+    .select("id, sku_codigo, nombre, precio_venta, stock_actual, activo_online, condicion_venta, categoria_id, descripcion, categorias(nombre)")
     .order("nombre")
     .limit(50);
 
@@ -59,6 +59,7 @@ export default async function AdminProductosPage({ searchParams }: Props) {
               <th className="p-3">Categoría</th>
               <th className="p-3">Condición de venta</th>
               <th className="p-3">Visible online</th>
+              <th className="p-3">Descripción</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -74,6 +75,7 @@ export default async function AdminProductosPage({ searchParams }: Props) {
                   activoOnline: p.activo_online,
                   condicionVenta: p.condicion_venta,
                   categoriaId: p.categoria_id,
+                  descripcion: p.descripcion,
                 }}
                 categorias={categorias ?? []}
                 precioFormateado={formatearPrecio(p.precio_venta)}

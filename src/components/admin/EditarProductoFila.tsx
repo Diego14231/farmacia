@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { actualizarProducto } from "@/services/admin/actions";
+import { EditarDescripcionProducto } from "./EditarDescripcionProducto";
 import {
   Select,
   SelectContent,
@@ -30,6 +31,7 @@ interface Props {
     activoOnline: boolean;
     condicionVenta: string | null;
     categoriaId: string | null;
+    descripcion: string | null;
   };
   categorias: Array<{ id: string; nombre: string }>;
   precioFormateado: string;
@@ -96,8 +98,15 @@ export function EditarProductoFila({ producto, categorias, precioFormateado }: P
           checked={producto.activoOnline}
           disabled={pendiente}
           onChange={(e) => actualizar({ activo_online: e.target.checked })}
-          className="size-4 accent-emerald-600"
+          className="size-4 accent-brand"
           aria-label={`Visible online: ${producto.nombre}`}
+        />
+      </td>
+      <td className="p-3">
+        <EditarDescripcionProducto
+          productoId={producto.id}
+          nombre={producto.nombre}
+          descripcion={producto.descripcion}
         />
       </td>
     </tr>

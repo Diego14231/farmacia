@@ -34,7 +34,7 @@ export function AgregarAlCarrito({ producto }: { producto: Producto }) {
   }
 
   return (
-    <Button onClick={onAgregar} className="w-full" variant={agregado ? "secondary" : "default"}>
+    <Button onClick={onAgregar} className="w-full" variant={agregado ? "secondary" : "success"}>
       {agregado ? (
         <>
           <Check className="size-4" /> Agregado

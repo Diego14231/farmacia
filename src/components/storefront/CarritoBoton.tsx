@@ -13,7 +13,7 @@ export function CarritoBoton() {
         <ShoppingCart className="size-4" />
         <span className="hidden sm:inline">Carrito</span>
         {totalItems > 0 && (
-          <span className="absolute -right-2 -top-2 flex size-5 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white">
+          <span className="absolute -right-2 -top-2 flex size-5 items-center justify-center rounded-full bg-brand-green text-xs font-semibold text-white">
             {totalItems > 99 ? "99+" : totalItems}
           </span>
         )}

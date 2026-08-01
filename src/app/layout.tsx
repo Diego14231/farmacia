@@ -15,11 +15,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Farmacia AhorraBien — Farmacia Online",
-    template: "%s | Farmacia AhorraBien",
+    default: "Farmacias AhorraBien — Farmacia Online",
+    template: "%s | Farmacias AhorraBien",
   },
   description:
-    "Farmacia AhorraBien — catálogo online, precios convenientes y despacho a domicilio.",
+    "Farmacias AhorraBien — catálogo online, precios convenientes y despacho a domicilio.",
 };
 
 export default function RootLayout({

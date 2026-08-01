@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { enviarConfirmacionPedido } from "@/services/pedidos/emails";
 
 /**
  * Webhook de Mercado Pago (notificaciones de pago).
  * MP manda ?type=payment&data.id=<paymentId>; se consulta el pago real a la
  * API de MP (nunca confiar en el body del webhook) y si está aprobado se
  * marca el pedido como pagado usando external_reference = pedidos.id.
+ *
+ * Nota: con la Orders API el pedido ya se actualiza de forma síncrona en
+ * procesarPagoConTarjeta() según la respuesta directa de /v1/orders -- este
+ * webhook queda como respaldo para pagos que confirman de forma asíncrona
+ * (pending/in_process) o para no depender solo de la respuesta síncrona.
  */
 export async function POST(req: NextRequest) {
-  const mpToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+  const mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
   if (!mpToken) return NextResponse.json({ ok: true }); // pasarela no configurada
 
   const url = new URL(req.url);
@@ -44,6 +50,10 @@ export async function POST(req: NextRequest) {
           estado: pedido.requiere_receta ? "pendiente_validacion_qf" : "pagado",
         })
         .eq("id", pedidoId);
+      // Idempotente (ver migración stock_pedido): seguro aunque el camino
+      // síncrono ya lo haya descontado.
+      await supabase.rpc("descontar_stock_pedido", { p_pedido_id: pedidoId });
+      await enviarConfirmacionPedido(pedidoId);
     }
   }
 
