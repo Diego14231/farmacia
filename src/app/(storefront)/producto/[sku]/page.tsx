@@ -85,7 +85,7 @@ export default async function ProductoPage({ params }: Props) {
           {producto.descripcion && (
             <>
               <Separator />
-              <p className="text-sm">{producto.descripcion}</p>
+              <p className="whitespace-pre-line text-sm">{producto.descripcion}</p>
             </>
           )}
 
