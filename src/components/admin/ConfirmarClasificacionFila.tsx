@@ -30,6 +30,13 @@ interface Props {
     sugeridoMedicamento: string | null;
     sugeridoReceta: string | null;
     detalle: string | null;
+    // Borrador heuristico (scripts/_clasificar_borrador*.ts) -- NO es la
+    // sugerencia del ISP, es un intento automatico aparte. Solo se usa para
+    // pre-llenar el selector cuando el ISP no determino nada; la Quimica
+    // Farmaceutica sigue teniendo que confirmar.
+    borradorEsMedicamento: boolean;
+    borradorCondicionVenta: string | null;
+    borradorPrincipioActivo: string | null;
   };
 }
 
@@ -56,13 +63,21 @@ function condicionSugerida(receta: string | null): string {
 
 export function ConfirmarClasificacionFila({ producto }: Props) {
   const [pendiente, startTransition] = useTransition();
+
+  // El ISP no siempre determina nada (texto "NO DETERMINADO" -> cae en
+  // "sin_clasificar" acá) -- en ese caso, se usa el borrador heuristico como
+  // punto de partida en vez de dejar el selector vacio. Sigue siendo un
+  // borrador: la Quimica Farmaceutica puede cambiarlo antes de confirmar.
+  const sugeridoISP = condicionSugerida(producto.sugeridoReceta);
+  const usandoBorrador = sugeridoISP === "sin_clasificar" && producto.borradorCondicionVenta != null;
+  const condicionInicial = usandoBorrador ? producto.borradorCondicionVenta! : sugeridoISP;
+
   const [esMedicamento, setEsMedicamento] = useState(
-    producto.sugeridoMedicamento === "SI" ||
-      producto.sugeridoMedicamento === "SI (ambiguo)",
+    usandoBorrador
+      ? producto.borradorEsMedicamento
+      : producto.sugeridoMedicamento === "SI" || producto.sugeridoMedicamento === "SI (ambiguo)",
   );
-  const [condicionVenta, setCondicionVenta] = useState(
-    condicionSugerida(producto.sugeridoReceta),
-  );
+  const [condicionVenta, setCondicionVenta] = useState(condicionInicial);
   const [confirmado, setConfirmado] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,6 +111,12 @@ export function ConfirmarClasificacionFila({ producto }: Props) {
       </td>
       <td className="max-w-sm p-3 align-top text-xs text-muted-foreground">
         {producto.detalle ?? "—"}
+        {producto.borradorPrincipioActivo && (
+          <div className="mt-1">
+            Borrador (heurística, no ISP) — principio activo:{" "}
+            <span className="font-medium text-foreground">{producto.borradorPrincipioActivo}</span>
+          </div>
+        )}
       </td>
       <td className="p-3 align-top">
         <label className="flex items-center gap-2 text-sm whitespace-nowrap">
@@ -110,6 +131,9 @@ export function ConfirmarClasificacionFila({ producto }: Props) {
         </label>
       </td>
       <td className="p-3 align-top">
+        {usandoBorrador && (
+          <p className="mb-1 text-xs text-amber-700">Precargado del borrador, no del ISP</p>
+        )}
         <Select value={condicionVenta} disabled={pendiente} onValueChange={setCondicionVenta}>
           <SelectTrigger className="w-48" size="sm">
             <SelectValue />

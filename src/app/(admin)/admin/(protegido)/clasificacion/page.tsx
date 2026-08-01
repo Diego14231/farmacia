@@ -42,7 +42,7 @@ export default async function AdminClasificacionPage({ searchParams }: Props) {
   const { data: productos, count: totalCola } = await supabase
     .from("productos")
     .select(
-      "id, sku_codigo, nombre, clasificacion_sugerida_medicamento, clasificacion_sugerida_receta, clasificacion_detalle",
+      "id, sku_codigo, nombre, clasificacion_sugerida_medicamento, clasificacion_sugerida_receta, clasificacion_detalle, es_medicamento, condicion_venta, principio_activo",
       { count: "exact" },
     )
     .eq("clasificacion_revisar_manual", true)
@@ -115,6 +115,9 @@ export default async function AdminClasificacionPage({ searchParams }: Props) {
                       sugeridoMedicamento: p.clasificacion_sugerida_medicamento,
                       sugeridoReceta: p.clasificacion_sugerida_receta,
                       detalle: p.clasificacion_detalle,
+                      borradorEsMedicamento: p.es_medicamento,
+                      borradorCondicionVenta: p.condicion_venta,
+                      borradorPrincipioActivo: p.principio_activo,
                     }}
                   />
                 ))}
