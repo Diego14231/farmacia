@@ -7,6 +7,7 @@ export function formatearPrecio(valor: number): string {
 }
 
 const UNIDAD_POR_PALABRA: Record<string, string> = {
+  com: "comprimido", // abreviatura chilena mas comun ("32 COM."), sin la "p"
   comp: "comprimido",
   comprimido: "comprimido",
   tab: "tableta",
@@ -17,11 +18,14 @@ const UNIDAD_POR_PALABRA: Record<string, string> = {
   sobre: "sobre",
   ovulo: "óvulo",
   supositorio: "supositorio",
+  amp: "ampolla",
   ampolla: "ampolla",
   perla: "perla",
   gragea: "gragea",
   parche: "parche",
   ml: "ml",
+  gr: "gramo",
+  g: "gramo",
 };
 
 // Busca un patrón "<cantidad> <forma>" en el nombre crudo del producto (ej.
@@ -29,8 +33,14 @@ const UNIDAD_POR_PALABRA: Record<string, string> = {
 // unidad, al estilo de las farmacias de descuento (Doctor Simi, etc.). Es
 // deliberadamente conservador: si no encuentra un patrón confiable, no
 // inventa nada y el llamador simplemente no muestra el dato.
+//
+// "com\.?" y "amp\.?" cubren las abreviaturas de 3 letras que usa la mayoria
+// del inventario real (COM./AMP., no COMP./AMPOLLA) -- sin esto, ~575
+// medicamentos con cantidad SI declarada en el nombre no mostraban precio
+// por unidad. "g\." exige el punto (no "g" suelto) para no confundir
+// fragmentos de otras palabras con gramos.
 const PATRON_CANTIDAD =
-  /(\d+)\s*(comprimidos?|comp\.?|tabletas?|tab\.?|c[aá]psulas?|caps?\.?|sobres?|[oó]vulos?|supositorios?|ampollas?|perlas?|grageas?|parches?|ml)\b/i;
+  /(\d+)\s*(comprimidos?|comp\.?|com\.?|tabletas?|tab\.?|c[aá]psulas?|caps?\.?|sobres?|[oó]vulos?|supositorios?|ampollas?|amp\.?|perlas?|grageas?|parches?|gr\.?|g\.|ml)\b/i;
 
 export interface PrecioPorUnidad {
   cantidad: number;
